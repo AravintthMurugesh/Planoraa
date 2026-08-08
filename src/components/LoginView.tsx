@@ -142,12 +142,6 @@ export const LoginView: React.FC = () => {
       {/* Top Header Bar */}
       <header className="w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between relative z-10">
         <div className="flex items-center gap-3">
-          <img
-            src="/src/assets/images/planora_logo_1784957089188.jpg"
-            alt="Planora Logo"
-            referrerPolicy="no-referrer"
-            className="w-10 h-10 rounded-xl object-contain bg-white p-1 shadow-md border border-slate-200 dark:border-white/10 shrink-0"
-          />
           <div className="flex flex-col">
             <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight leading-tight">
               Planora
@@ -186,17 +180,9 @@ export const LoginView: React.FC = () => {
             <div className="absolute inset-0 bg-indigo-500/10 backdrop-blur-3xl pointer-events-none" />
             
             <div className="relative z-10 space-y-6">
-              <div className="flex items-center gap-3">
-                <img
-                  src="/src/assets/images/planora_logo_1784957089188.jpg"
-                  alt="Planora Logo"
-                  referrerPolicy="no-referrer"
-                  className="w-12 h-12 rounded-2xl object-contain bg-white p-1 shadow-lg shrink-0"
-                />
-                <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Planora</h2>
-                  <p className="text-xs text-indigo-200/90 font-medium">Your all-in-one planning workspace.</p>
-                </div>
+              <div>
+                <h2 className="text-2xl font-black text-white tracking-tight">Planora</h2>
+                <p className="text-xs text-indigo-200/90 font-medium">Your all-in-one planning workspace.</p>
               </div>
 
               <div className="pt-6 border-t border-white/10 space-y-4">

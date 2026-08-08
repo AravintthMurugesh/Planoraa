@@ -24,23 +24,15 @@ const MainLayout: React.FC = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#0B1020] text-white relative overflow-hidden">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-[#0B1020] text-slate-900 dark:text-white relative overflow-hidden">
         {/* Background ambient lighting */}
         <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
         <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
         
         <div className="relative z-10 flex flex-col items-center gap-4 p-8 glass-card">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 p-0.5 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
-            <img
-              src="/src/assets/images/planora_logo_1784957089188.jpg"
-              alt="Planora"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-contain rounded-xl bg-white p-1"
-            />
-          </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm font-bold tracking-tight text-slate-200">Initializing Planora...</span>
+            <span className="text-sm font-bold tracking-tight text-slate-700 dark:text-slate-200">Initializing Planora...</span>
           </div>
         </div>
       </div>

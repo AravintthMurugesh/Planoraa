@@ -53,8 +53,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         onClick={() => handleSelect(item.id)}
         className={`relative w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-bold text-xs transition-all duration-300 group cursor-pointer mb-1 ${
           isActive
-            ? 'text-white'
-            : 'text-slate-400 hover:text-white hover:bg-white/5'
+            ? 'text-indigo-600 dark:text-white'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-900/5 dark:hover:bg-white/5'
         }`}
       >
         {isActive && (
@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         )}
 
         <div className="relative z-10 flex items-center gap-3">
-          <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-indigo-500/30 text-indigo-300' : 'bg-white/5 text-slate-400 group-hover:text-white group-hover:bg-white/10'}`}>
+          <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-indigo-500/15 text-indigo-600 dark:bg-indigo-500/30 dark:text-indigo-300' : 'bg-slate-900/5 dark:bg-white/5 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:bg-slate-900/10 dark:group-hover:bg-white/10'}`}>
             <Icon className="w-4 h-4" />
           </div>
           <span className="tracking-wide">{item.label}</span>
@@ -76,10 +76,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
           <span
             className={`relative z-10 text-[10px] font-black px-2 py-0.5 rounded-full transition-all ${
               isActive
-                ? 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/40'
+                ? 'bg-indigo-500/15 text-indigo-600 dark:bg-indigo-500/30 dark:text-indigo-200 border border-indigo-400/40'
                 : item.badge.toString().includes('Alert')
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse'
-                : 'bg-white/5 text-slate-400 border border-white/10'
+                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30 animate-pulse'
+                : 'bg-slate-900/5 dark:bg-white/5 text-slate-500 dark:text-slate-400 border border-slate-200/80 dark:border-white/10'
             }`}
           >
             {item.badge}
@@ -90,17 +90,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
   };
 
   const sidebarContent = (
-    <aside className="w-64 h-full rounded-2xl glass-panel border border-white/10 flex flex-col justify-between p-4 select-none shadow-2xl overflow-y-auto">
+    <aside className="w-64 h-full rounded-2xl glass-panel border border-slate-200/80 dark:border-white/10 flex flex-col justify-between p-4 select-none shadow-2xl overflow-y-auto">
       <div className="space-y-4">
         {/* Mobile Header */}
         <div className="px-2 py-1 flex items-center justify-between md:hidden">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-            <span className="font-extrabold text-sm text-white tracking-tight">Navigation Dock</span>
+            <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+            <span className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">Navigation Dock</span>
           </div>
           <button
             onClick={onMobileClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-white/10"
+            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-900/10 dark:hover:bg-white/10"
           >
             <X className="w-5 h-5" />
           </button>
@@ -108,8 +108,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
 
         {/* Navigation Section */}
         <div>
-          <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-            <Zap className="w-3 h-3 text-indigo-400" />
+          <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
             <span>Core Modules</span>
           </div>
           <nav className="space-y-0.5">
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         </div>
 
         <div>
-          <div className="mt-4 px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+          <div className="mt-4 px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-sm" />
             <span>Spaces & Archives</span>
           </div>

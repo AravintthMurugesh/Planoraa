@@ -1,0 +1,6 @@
+{
+  "name": "Planora",
+  "description": "A premium, modern productivity application with task management, Kanban boards, calendar, timetable, interactive notes, and personal analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

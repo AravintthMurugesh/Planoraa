@@ -77,7 +77,9 @@ export const QuickAddTaskModal: React.FC = () => {
           {/* Header */}
           <div className="px-6 py-4 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between">
             <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-ping" />
+              <span className="p-1.5 rounded-lg bg-[var(--accent-soft)] text-[var(--accent-color)]">
+                <Sparkles className="w-4 h-4" />
+              </span>
               <span>Create New Task</span>
             </h3>
             <button
@@ -218,9 +220,9 @@ export const QuickAddTaskModal: React.FC = () => {
                 />
                 <button
                   type="button"
-                  onClick={handleAddSubtask}
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
-                >
+onClick={handleAddSubtask}
+                className="px-3.5 py-2.5 rounded-xl bg-[var(--accent-soft)] text-[var(--accent-color)] text-xs font-bold hover:opacity-85 transition-all flex items-center gap-1 cursor-pointer btn-press"
+              >
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </div>
@@ -257,7 +259,7 @@ export const QuickAddTaskModal: React.FC = () => {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer"
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] hover:opacity-90 text-white font-bold text-xs shadow-lg shadow-[var(--accent-soft)] btn-press cursor-pointer"
               >
                 Create Task
               </button>

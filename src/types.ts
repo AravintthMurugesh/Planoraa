@@ -1,5 +1,26 @@
+/* ------------------------------------------------------------------ */
+/*  Planora — Core Domain Types                                       */
+/* ------------------------------------------------------------------ */
+
 export type Priority = 'low' | 'medium' | 'high';
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
+export type ViewTab =
+  | 'home'
+  | 'todo'
+  | 'tracker'
+  | 'calendar'
+  | 'timetable'
+  | 'notes'
+  | 'favorites'
+  | 'archive'
+  | 'settings';
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type AccentColor = 'indigo' | 'violet' | 'emerald' | 'rose' | 'amber' | 'slate';
+export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+interface BaseEntity {
+  id: string;
+}
 
 export interface Subtask {
   id: string;
@@ -7,17 +28,24 @@ export interface Subtask {
   completed: boolean;
 }
 
-export interface Task {
-  id: string;
+export interface Attachment {
+  name: string;
+  url: string;
+  size?: string;
+}
+
+export interface Task extends BaseEntity {
   title: string;
   description?: string;
-  dueDate: string; // YYYY-MM-DD
-  dueTime?: string; // HH:MM
+  /** YYYY-MM-DD */
+  dueDate: string;
+  /** HH:MM */
+  dueTime?: string;
   priority: Priority;
   status: TaskStatus;
   category: string;
   tags: string[];
-  attachments?: { name: string; url: string; size?: string }[];
+  attachments?: Attachment[];
   notes?: string;
   subtasks?: Subtask[];
   isFavorite?: boolean;
@@ -26,13 +54,17 @@ export interface Task {
   completedAt?: string;
 }
 
-export interface CalendarEvent {
-  id: string;
+export type CalendarEventCategory = 'work' | 'personal' | 'meeting' | 'study' | 'holiday' | 'other';
+
+export interface CalendarEvent extends BaseEntity {
   title: string;
-  date: string; // YYYY-MM-DD
-  startTime: string; // HH:MM
-  endTime: string; // HH:MM
-  category: 'work' | 'personal' | 'meeting' | 'study' | 'holiday' | 'other';
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM */
+  startTime: string;
+  /** HH:MM */
+  endTime: string;
+  category: CalendarEventCategory;
   color: string;
   description?: string;
   isMeeting?: boolean;
@@ -41,13 +73,12 @@ export interface CalendarEvent {
   reminderMinutes?: number;
 }
 
-export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
-
-export interface TimetableSlot {
-  id: string;
+export interface TimetableSlot extends BaseEntity {
   day: DayOfWeek;
-  startTime: string; // HH:MM e.g. "09:00"
-  endTime: string; // HH:MM e.g. "10:30"
+  /** HH:MM e.g. "09:00" */
+  startTime: string;
+  /** HH:MM e.g. "10:30" */
+  endTime: string;
   subject: string;
   room: string;
   teacher: string;
@@ -55,17 +86,30 @@ export interface TimetableSlot {
   type: 'class' | 'break' | 'study' | 'lab';
 }
 
-export interface NoteBlock {
-  id: string;
-  type: 'heading1' | 'heading2' | 'paragraph' | 'checklist' | 'bullet' | 'number' | 'code' | 'quote' | 'callout' | 'table';
+export type NoteBlockType =
+  | 'heading1'
+  | 'heading2'
+  | 'paragraph'
+  | 'checklist'
+  | 'bullet'
+  | 'number'
+  | 'code'
+  | 'quote'
+  | 'callout'
+  | 'table';
+
+export interface NoteBlock extends BaseEntity {
+  type: NoteBlockType;
   content: string;
-  checked?: boolean; // for checklist
-  language?: string; // for code block
-  tableData?: string[][]; // for table block [row][col]
+  /** checklist blocks */
+  checked?: boolean;
+  /** code blocks */
+  language?: string;
+  /** table blocks — [row][col] */
+  tableData?: string[][];
 }
 
-export interface Note {
-  id: string;
+export interface Note extends BaseEntity {
   title: string;
   blocks: NoteBlock[];
   category: string;
@@ -78,10 +122,16 @@ export interface Note {
   updatedAt: string;
 }
 
-export interface ActivityItem {
-  id: string;
+export type ActivityType =
+  | 'task_completed'
+  | 'task_created'
+  | 'note_created'
+  | 'event_added'
+  | 'timetable_updated';
+
+export interface ActivityItem extends BaseEntity {
   title: string;
-  type: 'task_completed' | 'task_created' | 'note_created' | 'event_added' | 'timetable_updated';
+  type: ActivityType;
   timestamp: string;
   meta?: string;
 }
@@ -90,42 +140,29 @@ export interface UserProfile {
   name: string;
   email: string;
   role: string;
-  avatar: string;
-  avatarUrl?: string;
   provider?: string;
   createdAt?: string;
   userId?: string;
 }
 
-export type ThemeMode = 'light' | 'dark' | 'system';
-export type AccentColor = 'indigo' | 'violet' | 'emerald' | 'rose' | 'amber' | 'slate';
+export interface NotificationSettings {
+  taskReminders: boolean;
+  calendarAlerts: boolean;
+  dailyDigest: boolean;
+  soundEnabled: boolean;
+}
 
 export interface UserSettings {
   theme: ThemeMode;
   accentColor: AccentColor;
   fontFamily: 'sans' | 'mono' | 'serif';
-  notifications: {
-    taskReminders: boolean;
-    calendarAlerts: boolean;
-    dailyDigest: boolean;
-    soundEnabled: boolean;
-  };
+  notifications: NotificationSettings;
   language: string;
 }
 
-export type ViewTab =
-  | 'home'
-  | 'todo'
-  | 'tracker'
-  | 'calendar'
-  | 'timetable'
-  | 'notes'
-  | 'favorites'
-  | 'archive'
-  | 'settings';
+export type ToastType = 'success' | 'info' | 'warning' | 'error';
 
-export interface ToastMessage {
-  id: string;
+export interface ToastMessage extends BaseEntity {
   title: string;
-  type?: 'success' | 'info' | 'warning' | 'error';
+  type?: ToastType;
 }

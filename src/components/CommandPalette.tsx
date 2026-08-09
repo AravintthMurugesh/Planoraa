@@ -160,7 +160,7 @@ export const CommandPalette: React.FC = () => {
         >
           {/* Header Search Input */}
           <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/10 flex items-center gap-3">
-            <Search className="w-5 h-5 text-indigo-500 shrink-0" />
+            <Search className="w-5 h-5 text-[var(--accent-color)] shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -200,7 +200,7 @@ export const CommandPalette: React.FC = () => {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer text-xs font-bold transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20'
+                          ? 'bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] text-white shadow-md shadow-[var(--accent-soft)]'
                           : 'text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                       }`}
                     >
@@ -222,7 +222,7 @@ export const CommandPalette: React.FC = () => {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer text-xs font-bold transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20'
+                          ? 'bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] text-white shadow-md shadow-[var(--accent-soft)]'
                           : 'text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                       }`}
                     >
@@ -246,7 +246,7 @@ export const CommandPalette: React.FC = () => {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer text-xs font-bold transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20'
+                          ? 'bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] text-white shadow-md shadow-[var(--accent-soft)]'
                           : 'text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                       }`}
                     >
@@ -270,12 +270,12 @@ export const CommandPalette: React.FC = () => {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer text-xs font-bold transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20'
+                          ? 'bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] text-white shadow-md shadow-[var(--accent-soft)]'
                           : 'text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <Calendar className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-indigo-500'}`} />
+                        <Calendar className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-[var(--accent-color)]'}`} />
                         <span className="truncate max-w-md">{ev.title}</span>
                       </div>
                       <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
@@ -294,7 +294,7 @@ export const CommandPalette: React.FC = () => {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer text-xs font-bold transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20'
+                          ? 'bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] text-white shadow-md shadow-[var(--accent-soft)]'
                           : 'text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                       }`}
                     >
@@ -318,7 +318,7 @@ export const CommandPalette: React.FC = () => {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer text-xs font-bold transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20'
+                          ? 'bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] text-white shadow-md shadow-[var(--accent-soft)]'
                           : 'text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                       }`}
                     >

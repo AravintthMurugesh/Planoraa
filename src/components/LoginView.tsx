@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
+import AuroraBackground from './AuroraBackground';
 import { isSupabaseConfigured } from '../supabase';
 import {
   Lock,
@@ -66,7 +68,7 @@ export const LoginView: React.FC = () => {
 
     if (!isSupabaseConfigured()) {
       const displayName = isSignUp ? name.trim() : (name.trim() || 'Alex Morgan');
-      login(email || 'user@planora.app', displayName);
+      login(email || 'user@planora.app', displayName, isSignUp);
       setIsLoading(false);
       return;
     }
@@ -134,14 +136,25 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-between bg-slate-50 dark:bg-[#0B1020] text-slate-900 dark:text-slate-100 transition-colors duration-200 relative overflow-hidden">
-      {/* Background ambient lighting */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen w-full flex flex-col justify-between bg-[#F8FAFC] dark:bg-[#070B15] text-slate-900 dark:text-slate-100 transition-colors duration-200 relative overflow-hidden">
+      <AuroraBackground />
 
       {/* Top Header Bar */}
-      <header className="w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between relative z-10">
+      <motion.header
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between relative z-10"
+      >
         <div className="flex items-center gap-3">
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
+            className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[var(--accent-color)] to-[var(--accent-hover)] flex items-center justify-center text-white shadow-lg shadow-[var(--accent-soft)] animate-float"
+          >
+            <Sparkles className="w-4 h-4" />
+          </motion.div>
           <div className="flex flex-col">
             <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight leading-tight">
               Planora
@@ -152,32 +165,57 @@ export const LoginView: React.FC = () => {
           </div>
         </div>
 
-        <button
+        <motion.button
+          whileHover={{ scale: 1.06, rotate: -4 }}
+          whileTap={{ scale: 0.92 }}
           onClick={toggleTheme}
           title="Toggle Theme"
           className="p-2.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-2 text-xs font-bold shadow-xs cursor-pointer"
         >
-          {settings.theme === 'dark' ? (
-            <>
-              <Sun className="w-4 h-4 text-amber-400" />
-              <span className="hidden sm:inline">Light Mode</span>
-            </>
-          ) : (
-            <>
-              <Moon className="w-4 h-4 text-indigo-600" />
-              <span className="hidden sm:inline">Dark Mode</span>
-            </>
-          )}
-        </button>
-      </header>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={settings.theme}
+              initial={{ rotate: -120, opacity: 0, scale: 0.4 }}
+              animate={{ rotate: 0, opacity: 1, scale: 1 }}
+              exit={{ rotate: 120, opacity: 0, scale: 0.4 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+              className="flex items-center gap-2"
+            >
+              {settings.theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="hidden sm:inline">Light Mode</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-[var(--accent-color)]" />
+                  <span className="hidden sm:inline">Dark Mode</span>
+                </>
+              )}
+            </motion.span>
+          </AnimatePresence>
+        </motion.button>
+      </motion.header>
 
       {/* Main Form Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative z-10 my-auto">
-        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 glass-panel border border-slate-200/80 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, y: 36, scale: 0.97, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+          transition={{ delay: 0.2, duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 glass-panel border border-slate-200/80 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+        >
           
           {/* Left Brand Panel */}
-          <div className="md:col-span-5 bg-gradient-to-br from-indigo-950 via-slate-950 to-purple-950 p-8 text-white flex flex-col justify-between relative overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.35, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="md:col-span-5 bg-gradient-to-br from-indigo-950 via-slate-950 to-purple-950 p-8 text-white flex flex-col justify-between relative overflow-hidden"
+          >
             <div className="absolute inset-0 bg-indigo-500/10 backdrop-blur-3xl pointer-events-none" />
+            <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full blur-3xl pointer-events-none bg-[var(--accent-color)]/25 animate-float-slow" />
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full blur-3xl pointer-events-none bg-purple-500/20 animate-float" />
             
             <div className="relative z-10 space-y-6">
               <div>
@@ -191,51 +229,51 @@ export const LoginView: React.FC = () => {
                 </p>
 
                 <div className="space-y-3 text-xs font-medium">
-                  <div className="flex items-center gap-3 text-indigo-100">
-                    <div className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-300 shrink-0">
-                      <CheckCircle2 className="w-4 h-4" />
-                    </div>
-                    <span>Interactive Tasks & Task Flow Board</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-indigo-100">
-                    <div className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-300 shrink-0">
-                      <Calendar className="w-4 h-4" />
-                    </div>
-                    <span>Calendar & Agenda Schedule</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-indigo-100">
-                    <div className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-300 shrink-0">
-                      <Clock className="w-4 h-4" />
-                    </div>
-                    <span>Weekly Timetable Planner</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-indigo-100">
-                    <div className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-300 shrink-0">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <span>Modular Block Notes & Knowledge Base</span>
-                  </div>
+                  {[
+                    { icon: CheckCircle2, text: 'Interactive Tasks & Task Flow Board' },
+                    { icon: Calendar, text: 'Calendar & Agenda Schedule' },
+                    { icon: Clock, text: 'Weekly Timetable Planner' },
+                    { icon: FileText, text: 'Modular Block Notes & Knowledge Base' },
+                  ].map((f, i) => {
+                    const Icon = f.icon;
+                    return (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -16 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 + i * 0.12, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex items-center gap-3 text-indigo-100"
+                      >
+                        <div className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-300 shrink-0 hover:scale-110 transition-transform">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <span>{f.text}</span>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            <div className="relative z-10 pt-8 border-t border-white/10 mt-8">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.9, duration: 0.5 }}
+              className="relative z-10 pt-8 border-t border-white/10 mt-8"
+            >
               <div className="flex items-center gap-2 text-indigo-300 text-xs font-semibold">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span>Protected with Supabase Auth Security</span>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* Right Form */}
           <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-between space-y-6">
             <div>
               <div className="text-left mb-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 inline-flex items-center gap-1">
+                  <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-[var(--accent-soft)] text-[var(--accent-color)] border border-[var(--accent-soft)] inline-flex items-center gap-1">
                     <Sparkles className="w-3 h-3" /> Planora Workspace
                   </span>
                 </div>
@@ -248,8 +286,8 @@ export const LoginView: React.FC = () => {
                     : 'Sign in to access your personal workspace.'}
                 </p>
                 {isSignUp && (
-                  <div className="mt-3 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                  <div className="mt-3 p-2.5 rounded-xl bg-[var(--accent-soft)] border border-[var(--accent-soft)] text-[var(--accent-color)] text-[11px] font-bold flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--accent-color)] shrink-0" />
                     <span>New account signups start with a clean workspace so you can add your own data from scratch.</span>
                   </div>
                 )}
@@ -264,13 +302,18 @@ export const LoginView: React.FC = () => {
                     setError(null);
                     setSuccessMessage(null);
                   }}
-                  className={`py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
-                    !isSignUp
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  className={`relative py-2 text-xs font-extrabold rounded-xl transition-colors cursor-pointer ${
+                    !isSignUp ? 'text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  Sign In
+                  {!isSignUp && (
+                    <motion.span
+                      layoutId="login-mode-pill"
+                      className="absolute inset-0 rounded-xl bg-[var(--accent-color)] shadow-md shadow-[var(--accent-soft)]"
+                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">Sign In</span>
                 </button>
                 <button
                   type="button"
@@ -279,13 +322,18 @@ export const LoginView: React.FC = () => {
                     setError(null);
                     setSuccessMessage(null);
                   }}
-                  className={`py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
-                    isSignUp
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  className={`relative py-2 text-xs font-extrabold rounded-xl transition-colors cursor-pointer ${
+                    isSignUp ? 'text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  Sign Up
+                  {isSignUp && (
+                    <motion.span
+                      layoutId="login-mode-pill"
+                      className="absolute inset-0 rounded-xl bg-[var(--accent-color)] shadow-md shadow-[var(--accent-soft)]"
+                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">Sign Up</span>
                 </button>
               </div>
 
@@ -324,7 +372,7 @@ export const LoginView: React.FC = () => {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="e.g. alex.morgan"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
                       />
                     </div>
                   </div>
@@ -342,7 +390,7 @@ export const LoginView: React.FC = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="name@gmail.com"
-                      className="w-full pl-10 pr-4 py-3 bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
                     />
                   </div>
                 </div>
@@ -370,7 +418,7 @@ export const LoginView: React.FC = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-10 pr-10 py-3 bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      className="w-full pl-10 pr-10 py-3 bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/50"
                     />
                     <button
                       type="button"
@@ -388,26 +436,34 @@ export const LoginView: React.FC = () => {
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      className="w-4 h-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] cursor-pointer"
                     />
                     <span className="text-xs text-slate-600 dark:text-slate-400 font-bold">Remember me</span>
                   </label>
                 </div>
 
-                <button
+                <motion.button
                   type="submit"
-disabled={isLoading}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
+                  disabled={isLoading}
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-hover)] hover:opacity-90 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-[var(--accent-soft)] flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50 btn-shine"
                 >
                   {isLoading ? (
                     <span className="animate-pulse">Authenticating...</span>
                   ) : (
                     <>
                       <span>{isSignUp ? 'Create Planora Account' : 'Sign In to Workspace'}</span>
-                      <ArrowRight className="w-4 h-4 stroke-[3]" />
+                      <motion.span
+                        animate={{ x: [0, 4, 0] }}
+                        transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 0.8, ease: 'easeInOut' }}
+                        className="flex"
+                      >
+                        <ArrowRight className="w-4 h-4 stroke-[3]" />
+                      </motion.span>
                     </>
                   )}
-                </button>
+                </motion.button>
               </form>
 
               {/* Quick Demo Access */}
@@ -435,7 +491,7 @@ disabled={isLoading}
             </div>
           </div>
 
-        </div>
+        </motion.div>
       </main>
 
       {/* Footer copyright */}

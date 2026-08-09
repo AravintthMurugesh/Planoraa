@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import { User, AuthError, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { uid, todayISO } from '../lib/utils';
+import { readStorage, writeStorage, removeStorage } from '../lib/storage';
 import {
   Task,
   CalendarEvent,
@@ -12,8 +14,9 @@ import {
   ViewTab,
   ToastMessage,
   TaskStatus,
-  Priority,
   NoteBlock,
+  ActivityType,
+  ToastType,
 } from '../types';
 import {
   initialTasks,
@@ -24,6 +27,17 @@ import {
   initialProfile,
   initialSettings,
 } from '../data/initialData';
+
+const STORAGE_KEYS = {
+  tasks: 'mytasks_items',
+  events: 'mytasks_events',
+  timetable: 'mytasks_timetable',
+  notes: 'mytasks_notes',
+  activities: 'mytasks_activities',
+  profile: 'mytasks_profile',
+  settings: 'mytasks_settings',
+  authenticated: 'planora_authenticated',
+} as const;
 
 const OAUTH_URL_PARAMS = [
   'access_token',
@@ -61,11 +75,24 @@ const cleanupOAuthUrl = () => {
   }
 };
 
+const hashPin = (pin: string): string => {
+  let h = 5381;
+  for (let i = 0; i < pin.length; i++) {
+    h = ((h << 5) + h + pin.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(36);
+};
+
+interface AuthResult {
+  data: { session?: Session | null } | null;
+  error: { message: string } | null;
+}
+
 interface AppContextType {
   // Navigation
   activeTab: ViewTab;
   setActiveTab: (tab: ViewTab) => void;
-  
+
   // Tasks
   tasks: Task[];
   addTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
@@ -97,6 +124,14 @@ interface AppContextType {
   toggleNoteArchive: (id: string) => void;
   updateNoteBlocks: (noteId: string, blocks: NoteBlock[]) => void;
 
+  // Vault PIN
+  hasVaultPin: boolean;
+  isVaultUnlocked: boolean;
+  setVaultPin: (pin: string) => void;
+  unlockVault: (pin: string) => boolean;
+  lockVault: () => void;
+  resetVaultPin: () => void;
+
   // Activity Log
   activities: ActivityItem[];
 
@@ -106,13 +141,13 @@ interface AppContextType {
   supabaseUser: User | null;
   oauthSigninError: string | null;
   clearOauthSigninError: () => void;
-  login: (email?: string, name?: string) => void;
+  login: (email?: string, name?: string, isNewSignUp?: boolean) => void;
   logout: () => void;
-  signupWithSupabase: (email: string, pass: string, fullName: string) => Promise<{ data: any; error: any }>;
-  loginWithSupabase: (email: string, pass: string) => Promise<{ data: any; error: any }>;
-  loginWithGoogleSupabase: () => Promise<{ data: any; error: any }>;
+  signupWithSupabase: (email: string, pass: string, fullName: string) => Promise<AuthResult>;
+  loginWithSupabase: (email: string, pass: string) => Promise<AuthResult>;
+  loginWithGoogleSupabase: () => Promise<AuthResult>;
   logoutWithSupabase: () => Promise<void>;
-  resetPasswordWithSupabase: (email: string) => Promise<{ data: any; error: any }>;
+  resetPasswordWithSupabase: (email: string) => Promise<{ error: { message: string } | null }>;
 
   // Profile & Settings
   profile: UserProfile;
@@ -131,7 +166,7 @@ interface AppContextType {
 
   // Toast
   toasts: ToastMessage[];
-  addToast: (title: string, type?: ToastMessage['type']) => void;
+  addToast: (title: string, type?: ToastType) => void;
   removeToast: (id: string) => void;
 
   // Helper selectors
@@ -146,88 +181,155 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load initial state from LocalStorage or defaults
+  // ---------------- Navigation & Global UI State ----------------
   const [activeTab, setActiveTab] = useState<ViewTab>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [isQuickTaskModalOpen, setQuickTaskModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    try {
-      const saved = localStorage.getItem('mytasks_items');
-      return saved ? JSON.parse(saved) : initialTasks;
-    } catch {
-      return initialTasks;
-    }
-  });
+  // ---------------- Persistent Workspace Data ----------------
+  const [tasks, setTasks] = useState<Task[]>(() => readStorage<Task[]>(STORAGE_KEYS.tasks, initialTasks));
+  const [events, setEvents] = useState<CalendarEvent[]>(() =>
+    readStorage<CalendarEvent[]>(STORAGE_KEYS.events, initialEvents)
+  );
+  const [timetable, setTimetable] = useState<TimetableSlot[]>(() =>
+    readStorage<TimetableSlot[]>(STORAGE_KEYS.timetable, initialTimetableSlots)
+  );
+  const [notes, setNotes] = useState<Note[]>(() => readStorage<Note[]>(STORAGE_KEYS.notes, initialNotes));
+  const [activities, setActivities] = useState<ActivityItem[]>(() =>
+    readStorage<ActivityItem[]>(STORAGE_KEYS.activities, initialActivities)
+  );
+  const [profile, setProfile] = useState<UserProfile>(() =>
+    readStorage<UserProfile>(STORAGE_KEYS.profile, initialProfile)
+  );
+  const [settings, setSettings] = useState<UserSettings>(() =>
+    readStorage<UserSettings>(STORAGE_KEYS.settings, initialSettings)
+  );
 
-  const [events, setEvents] = useState<CalendarEvent[]>(() => {
-    try {
-      const saved = localStorage.getItem('mytasks_events');
-      return saved ? JSON.parse(saved) : initialEvents;
-    } catch {
-      return initialEvents;
-    }
-  });
+  const readRaw = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
 
-  const [timetable, setTimetable] = useState<TimetableSlot[]>(() => {
-    try {
-      const saved = localStorage.getItem('mytasks_timetable');
-      return saved ? JSON.parse(saved) : initialTimetableSlots;
-    } catch {
-      return initialTimetableSlots;
-    }
-  });
+const writeRaw = (key: string, value: string): void => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // best-effort
+  }
+};
 
-  const [notes, setNotes] = useState<Note[]>(() => {
-    try {
-      const saved = localStorage.getItem('mytasks_notes');
-      return saved ? JSON.parse(saved) : initialNotes;
-    } catch {
-      return initialNotes;
-    }
-  });
+// ---------------- Vault PIN ----------------
+  const vaultStorageKey = `planora_vault_pin_${profile.userId || 'local'}`;
+  const [hasVaultPin, setHasVaultPin] = useState<boolean>(() => Boolean(readRaw(vaultStorageKey)));
+  const [isVaultUnlocked, setIsVaultUnlocked] = useState<boolean>(false);
 
-  const [activities, setActivities] = useState<ActivityItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('mytasks_activities');
-      return saved ? JSON.parse(saved) : initialActivities;
-    } catch {
-      return initialActivities;
-    }
-  });
-
-  const [profile, setProfile] = useState<UserProfile>(() => {
-    try {
-      const saved = localStorage.getItem('mytasks_profile');
-      return saved ? JSON.parse(saved) : initialProfile;
-    } catch {
-      return initialProfile;
-    }
-  });
-
-  const [settings, setSettings] = useState<UserSettings>(() => {
-    try {
-      const saved = localStorage.getItem('mytasks_settings');
-      return saved ? JSON.parse(saved) : initialSettings;
-    } catch {
-      return initialSettings;
-    }
-  });
-
-  const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
-  const [oauthSigninError, setOauthSigninError] = useState<string | null>(null);
+  // ---------------- Auth state ----------------
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('planora_authenticated') === 'true';
+      return localStorage.getItem(STORAGE_KEYS.authenticated) === 'true';
     } catch {
       return false;
     }
   });
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
+  const [oauthSigninError, setOauthSigninError] = useState<string | null>(null);
 
-  // Initialize and listen to Supabase Auth State
+  // ---------------- Toast system ----------------
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const addToast = (title: string, type: ToastType = 'success') => {
+    const id = uid('toast');
+    setToasts((prev) => [...prev, { id, title, type }]);
+    window.setTimeout(() => removeToast(id), 4000);
+  };
+
+  // ---------------- Activity logger ----------------
+  const logActivity = (title: string, type: ActivityType, meta?: string) => {
+    const newItem: ActivityItem = { id: uid('act'), title, type, timestamp: 'Just now', meta };
+    setActivities((prev) => [newItem, ...prev.slice(0, 19)]);
+  };
+
+  // ---------------- Profile sync helpers ----------------
+  const syncProfileFromUser = (
+    user: { email?: string | null; id?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown>; created_at?: string }
+  ) => {
+    const fullName = String(user.user_metadata?.full_name || user.user_metadata?.name || '') || undefined;
+    const provider = String(user.app_metadata?.provider || 'google');
+    setProfile((prev) => ({
+      ...prev,
+      email: user.email || prev.email,
+      name: fullName || prev.name,
+      provider,
+      createdAt: user.created_at || prev.createdAt,
+      userId: user.id,
+    }));
+    return { fullName: fullName || user.email?.split('@')[0] || 'User', provider };
+  };
+
+  const upsertProfileRecord = (
+    userId: string,
+    fullName: string,
+    email?: string | null,
+    provider?: string
+  ) => {
+    if (!isSupabaseConfigured()) return;
+    supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: userId,
+          full_name: fullName,
+          email,
+          provider,
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      )
+      .then(({ error }) => {
+        if (error) console.debug('Profiles table note:', error.message);
+      });
+  };
+
+  // ---------------- Vault actions ----------------
+  const setVaultPin = (pin: string) => {
+    writeRaw(vaultStorageKey, hashPin(pin));
+    setHasVaultPin(true);
+    setIsVaultUnlocked(true);
+    addToast('Vault protected with a 4-digit PIN.', 'success');
+  };
+
+  const unlockVault = (pin: string): boolean => {
+    const stored = readRaw(vaultStorageKey);
+    if (stored && stored === hashPin(pin)) {
+      setIsVaultUnlocked(true);
+      return true;
+    }
+    return false;
+  };
+
+  const lockVault = () => setIsVaultUnlocked(false);
+
+  const resetVaultPin = () => {
+    removeStorage(vaultStorageKey);
+    setHasVaultPin(false);
+    setIsVaultUnlocked(false);
+    addToast('Vault PIN cleared. Archive is now unprotected.', 'info');
+  };
+
+  useEffect(() => {
+    setHasVaultPin(Boolean(readRaw(vaultStorageKey)));
+    setIsVaultUnlocked(false);
+  }, [profile.userId]);
+
+  // ---------------- Auth initialization ----------------
   useEffect(() => {
     let isMounted = true;
 
@@ -250,49 +352,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setOauthSigninError(oauthError);
         }
 
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
         if (error) {
           console.warn('Supabase getSession error:', error);
         }
 
-        if (session?.user) {
-          if (isMounted) {
-            setSupabaseUser(session.user);
-            setIsAuthenticated(true);
-            localStorage.setItem('planora_authenticated', 'true');
-            const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
-            const avatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture;
-            const provider = session.user.app_metadata?.provider || 'google';
-
-            setProfile((prev) => ({
-              ...prev,
-              email: session.user.email || prev.email,
-              name: fullName || prev.name,
-              avatar: avatarUrl || prev.avatar,
-              avatarUrl: avatarUrl || prev.avatarUrl,
-              provider: provider,
-              createdAt: session.user.created_at,
-              userId: session.user.id,
-            }));
-
-            if (isSupabaseConfigured()) {
-              supabase
-                .from('profiles')
-                .upsert({
-                  id: session.user.id,
-                  full_name: fullName || session.user.email?.split('@')[0] || 'User',
-                  email: session.user.email,
-                  avatar_url: avatarUrl,
-                  provider: provider,
-                  created_at: session.user.created_at || new Date().toISOString(),
-                }, { onConflict: 'id' })
-                .then(({ error }) => {
-                  if (error) {
-                    console.debug('Profiles table note:', error.message);
-                  }
-                });
-            }
-          }
+        if (session?.user && isMounted) {
+          setSupabaseUser(session.user);
+          setIsAuthenticated(true);
+          writeStorage(STORAGE_KEYS.authenticated, true);
+          const identity = syncProfileFromUser(session.user);
+          upsertProfileRecord(session.user.id, identity.fullName, session.user.email, identity.provider);
         }
       } catch (err) {
         console.warn('Supabase auth initialization error:', err);
@@ -304,51 +377,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setSupabaseUser(session.user);
         setIsAuthenticated(true);
-        localStorage.setItem('planora_authenticated', 'true');
-        const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
-        const avatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture;
-        const provider = session.user.app_metadata?.provider || 'google';
-
-        setProfile((prev) => ({
-          ...prev,
-          email: session.user.email || prev.email,
-          name: fullName || prev.name,
-          avatar: avatarUrl || prev.avatar,
-          avatarUrl: avatarUrl || prev.avatarUrl,
-          provider: provider,
-          createdAt: session.user.created_at,
-          userId: session.user.id,
-        }));
-
-        if (_event === 'SIGNED_IN') {
-          addToast(`Welcome to Planora, ${fullName || session.user.email?.split('@')[0] || 'User'}!`, 'success');
+        writeStorage(STORAGE_KEYS.authenticated, true);
+        const { fullName } = syncProfileFromUser(session.user);
+        upsertProfileRecord(
+          session.user.id,
+          fullName,
+          session.user.email,
+          session.user.app_metadata?.provider as string | undefined
+        );
+        if (event === 'SIGNED_IN') {
+          addToast(`Welcome to Planora, ${fullName}!`, 'success');
         }
-
-        if (isSupabaseConfigured()) {
-          supabase
-            .from('profiles')
-            .upsert({
-              id: session.user.id,
-              full_name: fullName || session.user.email?.split('@')[0] || 'User',
-              email: session.user.email,
-              avatar_url: avatarUrl,
-              provider: provider,
-              created_at: session.user.created_at || new Date().toISOString(),
-            }, { onConflict: 'id' })
-            .then(({ error }) => {
-              if (error) {
-                console.debug('Profiles table note:', error.message);
-              }
-            });
-        }
-      } else if (_event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT') {
         setSupabaseUser(null);
         setIsAuthenticated(false);
-        localStorage.removeItem('planora_authenticated');
+        removeStorage(STORAGE_KEYS.authenticated);
       }
       setAuthLoading(false);
     });
@@ -357,76 +406,84 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       isMounted = false;
       subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ---------------- Workspace lifecycle ----------------
   const clearWorkspaceData = () => {
     setTasks([]);
     setEvents([]);
     setTimetable([]);
     setNotes([]);
     setActivities([]);
-    try {
-      localStorage.setItem('mytasks_items', JSON.stringify([]));
-      localStorage.setItem('mytasks_events', JSON.stringify([]));
-      localStorage.setItem('mytasks_timetable', JSON.stringify([]));
-      localStorage.setItem('mytasks_notes', JSON.stringify([]));
-      localStorage.setItem('mytasks_activities', JSON.stringify([]));
-    } catch (e) {
-      console.error('Failed to clear localStorage workspace data:', e);
-    }
+    Object.values(STORAGE_KEYS)
+      .filter((k) => k !== STORAGE_KEYS.authenticated && k !== STORAGE_KEYS.profile && k !== STORAGE_KEYS.settings)
+      .forEach((key) => writeStorage(key, []));
   };
 
-  const signupWithSupabase = async (email: string, pass: string, fullName: string) => {
+  // ---------------- Auth actions ----------------
+  const signupWithSupabase = async (email: string, pass: string, fullName: string): Promise<AuthResult> => {
     clearWorkspaceData();
     if (!isSupabaseConfigured()) {
       login(email, fullName, true);
-      return { data: { user: null, session: null }, error: null };
+      return { data: { session: null }, error: null };
     }
     const res = await supabase.auth.signUp({
       email,
       password: pass,
-      options: {
-        data: {
-          full_name: fullName,
-          name: fullName,
-        },
-      },
+      options: { data: { full_name: fullName, name: fullName } },
     });
     if (!res.error && res.data.session) {
       setIsAuthenticated(true);
-      localStorage.setItem('planora_authenticated', 'true');
-      setProfile((prev) => ({
-        ...prev,
-        email: email,
-        name: fullName,
-      }));
+      writeStorage(STORAGE_KEYS.authenticated, true);
+      setProfile((prev) => ({ ...prev, email, name: fullName }));
       addToast(`Account created! Welcome to your fresh Planora workspace, ${fullName}.`, 'success');
     }
-    return res;
+    return { data: { session: res.data.session }, error: res.error };
   };
 
-  const loginWithSupabase = async (email: string, pass: string) => {
+  const loginWithSupabase = async (email: string, pass: string): Promise<AuthResult> => {
     if (!isSupabaseConfigured()) {
       login(email);
-      return { data: { user: null, session: null }, error: null };
+      return { data: { session: null }, error: null };
     }
-    const res = await supabase.auth.signInWithPassword({
-      email,
-      password: pass,
-    });
+    const res = await supabase.auth.signInWithPassword({ email, password: pass });
     if (!res.error && res.data.session) {
       setIsAuthenticated(true);
-      localStorage.setItem('planora_authenticated', 'true');
-      const userMeta = res.data.user?.user_metadata;
-      const fullName = userMeta?.full_name || userMeta?.name;
-      setProfile((prev) => ({
-        ...prev,
-        email: email,
-        name: fullName || prev.name,
-      }));
+      writeStorage(STORAGE_KEYS.authenticated, true);
+      const fullName = res.data.user?.user_metadata?.full_name || res.data.user?.user_metadata?.name;
+      setProfile((prev) => ({ ...prev, email, name: fullName || prev.name }));
       addToast('Signed in successfully!', 'success');
     }
-    return res;
+    return { data: { session: res.data.session }, error: res.error };
+  };
+
+  const loginWithGoogleSupabase = async (): Promise<AuthResult> => {
+    if (!isSupabaseConfigured()) {
+      login('alex.morgan@gmail.com', 'Alex Morgan');
+      addToast('Signed in with Google!', 'success');
+      return { data: { session: null }, error: null };
+    }
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: { access_type: 'offline', prompt: 'consent' },
+        },
+      });
+      if (data?.url) {
+        console.info('Google OAuth authorize URL (verify this points to your Supabase project):', data.url);
+      }
+      if (error) {
+        addToast(`Google authentication failed: ${error.message}`, 'error');
+      }
+      return { data: { session: null }, error };
+    } catch (err) {
+      console.error('Google OAuth error:', err);
+      addToast('An error occurred during Google sign-in.', 'error');
+      return { data: null, error: { message: 'Google sign-in failed' } };
+    }
   };
 
   const logoutWithSupabase = async () => {
@@ -439,63 +496,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     setSupabaseUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('planora_authenticated');
+    removeStorage(STORAGE_KEYS.authenticated);
+    lockVault();
     addToast('You have been logged out.', 'info');
   };
 
-  const resetPasswordWithSupabase = async (email: string) => {
+  const resetPasswordWithSupabase = async (
+    email: string
+  ): Promise<{ error: { message: string } | null }> => {
     if (!isSupabaseConfigured()) {
-      return { data: {}, error: null };
+      return { error: null };
     }
-    return await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin,
     });
-  };
-
-  const loginWithGoogleSupabase = async () => {
-    if (!isSupabaseConfigured()) {
-      login('alex.morgan@gmail.com', 'Alex Morgan');
-      addToast('Signed in with Google!', 'success');
-      return { data: { user: null, session: null }, error: null };
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-      if (data?.url) {
-        console.info('Google OAuth authorize URL (verify this points to your Supabase project):', data.url);
-      }
-      if (error) {
-        addToast(`Google authentication failed: ${error.message}`, 'error');
-      }
-      return { data, error };
-    } catch (err: any) {
-      console.error('Google OAuth error:', err);
-      addToast('An error occurred during Google sign-in.', 'error');
-      return { data: null, error: err };
-    }
+    return { error };
   };
 
   const login = (email?: string, name?: string, isNewSignUp: boolean = false) => {
-    if (isNewSignUp) {
-      clearWorkspaceData();
-    }
+    if (isNewSignUp) clearWorkspaceData();
     setIsAuthenticated(true);
-    localStorage.setItem('planora_authenticated', 'true');
+    writeStorage(STORAGE_KEYS.authenticated, true);
     if (email || name) {
-      setProfile((prev) => ({
-        ...prev,
-        email: email || prev.email,
-        name: name || prev.name,
-      }));
+      setProfile((prev) => ({ ...prev, email: email || prev.email, name: name || prev.name }));
     }
     addToast(`Welcome to Planora, ${name || profile.name}!`, 'success');
   };
@@ -504,54 +527,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     logoutWithSupabase();
   };
 
-  const clearOauthSigninError = () => {
-    setOauthSigninError(null);
-  };
+  const clearOauthSigninError = () => setOauthSigninError(null);
 
-  // LocalStorage Auto-Save
-  useEffect(() => {
-    try {
-      localStorage.setItem('mytasks_items', JSON.stringify(tasks));
-    } catch (e) { console.error(e); }
-  }, [tasks]);
+  // ---------------- Auto-persist ----------------
+  useEffect(() => writeStorage(STORAGE_KEYS.tasks, tasks), [tasks]);
+  useEffect(() => writeStorage(STORAGE_KEYS.events, events), [events]);
+  useEffect(() => writeStorage(STORAGE_KEYS.timetable, timetable), [timetable]);
+  useEffect(() => writeStorage(STORAGE_KEYS.notes, notes), [notes]);
+  useEffect(() => writeStorage(STORAGE_KEYS.activities, activities), [activities]);
+  useEffect(() => writeStorage(STORAGE_KEYS.profile, profile), [profile]);
+  useEffect(() => writeStorage(STORAGE_KEYS.settings, settings), [settings]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('mytasks_events', JSON.stringify(events));
-    } catch (e) { console.error(e); }
-  }, [events]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('mytasks_timetable', JSON.stringify(timetable));
-    } catch (e) { console.error(e); }
-  }, [timetable]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('mytasks_notes', JSON.stringify(notes));
-    } catch (e) { console.error(e); }
-  }, [notes]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('mytasks_activities', JSON.stringify(activities));
-    } catch (e) { console.error(e); }
-  }, [activities]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('mytasks_profile', JSON.stringify(profile));
-    } catch (e) { console.error(e); }
-  }, [profile]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('mytasks_settings', JSON.stringify(settings));
-    } catch (e) { console.error(e); }
-  }, [settings]);
-
-  // Apply Theme (Dark/Light/System)
+  // ---------------- Theme + accent application ----------------
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
@@ -560,14 +547,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const isDark =
         settings.theme === 'dark' ||
         (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-      if (isDark) {
-        root.classList.add('dark');
-        body.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-        body.classList.remove('dark');
-      }
+      root.classList.toggle('dark', isDark);
+      body.classList.toggle('dark', isDark);
+      root.dataset.accent = settings.accentColor;
     };
 
     applyTheme();
@@ -578,73 +560,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       mediaQuery.addEventListener('change', listener);
       return () => mediaQuery.removeEventListener('change', listener);
     }
-  }, [settings.theme]);
+  }, [settings.theme, settings.accentColor]);
 
-  // Toast System
-  const addToast = (title: string, type: ToastMessage['type'] = 'success') => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, title, type }]);
-    setTimeout(() => {
-      removeToast(id);
-    }, 4000);
-  };
-
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // Activity logger helper
-  const logActivity = (title: string, type: ActivityItem['type'], meta?: string) => {
-    const newItem: ActivityItem = {
-      id: Math.random().toString(36).substring(2, 9),
-      title,
-      type,
-      timestamp: 'Just now',
-      meta,
+  // ---------------- Keyboard shortcut: Cmd/Ctrl + K ----------------
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((open) => !open);
+      }
     };
-    setActivities((prev) => [newItem, ...prev.slice(0, 19)]);
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-  // Task Actions
+  // ---------------- Task actions ----------------
   const addTask = (taskData: Omit<Task, 'id' | 'createdAt'>) => {
-    const newTask: Task = {
-      ...taskData,
-      id: 'task-' + Math.random().toString(36).substring(2, 9),
-      createdAt: new Date().toISOString(),
-    };
+    const newTask: Task = { ...taskData, id: uid('task'), createdAt: new Date().toISOString() };
     setTasks((prev) => [newTask, ...prev]);
     addToast(`Task "${newTask.title}" created`, 'success');
     logActivity(`Created task "${newTask.title}"`, 'task_created', newTask.category);
   };
 
   const updateTask = (id: string, updates: Partial<Task>) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
-    );
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
     addToast('Task updated', 'info');
   };
 
   const deleteTask = (id: string) => {
     const target = tasks.find((t) => t.id === id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    if (target) {
-      addToast(`Task "${target.title}" deleted`, 'warning');
-    }
+    if (target) addToast(`Task "${target.title}" deleted`, 'warning');
   };
 
   const toggleTaskComplete = (id: string) => {
     setTasks((prev) =>
       prev.map((t) => {
-        if (t.id === id) {
-          const nextStatus = t.status === 'completed' ? 'todo' : 'completed';
-          const completedAt = nextStatus === 'completed' ? new Date().toISOString() : undefined;
-          if (nextStatus === 'completed') {
-            addToast(`Completed: ${t.title}`, 'success');
-            logActivity(`Completed task "${t.title}"`, 'task_completed', t.category);
-          }
-          return { ...t, status: nextStatus, completedAt };
+        if (t.id !== id) return t;
+        const nextStatus: TaskStatus = t.status === 'completed' ? 'todo' : 'completed';
+        const completedAt = nextStatus === 'completed' ? new Date().toISOString() : undefined;
+        if (nextStatus === 'completed') {
+          addToast(`Completed: ${t.title}`, 'success');
+          logActivity(`Completed task "${t.title}"`, 'task_completed', t.category);
         }
-        return t;
+        return { ...t, status: nextStatus, completedAt };
       })
     );
   };
@@ -652,12 +611,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const toggleTaskFavorite = (id: string) => {
     setTasks((prev) =>
       prev.map((t) => {
-        if (t.id === id) {
-          const isFav = !t.isFavorite;
-          addToast(isFav ? 'Added to favorites' : 'Removed from favorites', 'info');
-          return { ...t, isFavorite: isFav };
-        }
-        return t;
+        if (t.id !== id) return t;
+        const isFav = !t.isFavorite;
+        addToast(isFav ? 'Added to favorites' : 'Removed from favorites', 'info');
+        return { ...t, isFavorite: isFav };
       })
     );
   };
@@ -665,12 +622,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const toggleTaskArchive = (id: string) => {
     setTasks((prev) =>
       prev.map((t) => {
-        if (t.id === id) {
-          const isArch = !t.isArchived;
-          addToast(isArch ? 'Task archived' : 'Task restored', 'info');
-          return { ...t, isArchived: isArch };
-        }
-        return t;
+        if (t.id !== id) return t;
+        const isArch = !t.isArchived;
+        addToast(isArch ? 'Task archived' : 'Task restored', 'info');
+        return { ...t, isArchived: isArch };
       })
     );
   };
@@ -678,21 +633,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateTaskStatus = (id: string, status: TaskStatus) => {
     setTasks((prev) =>
       prev.map((t) => {
-        if (t.id === id) {
-          const completedAt = status === 'completed' ? new Date().toISOString() : undefined;
-          return { ...t, status, completedAt };
-        }
-        return t;
+        if (t.id !== id) return t;
+        return { ...t, status, completedAt: status === 'completed' ? new Date().toISOString() : undefined };
       })
     );
   };
 
-  // Event Actions
+  // ---------------- Event actions ----------------
   const addEvent = (eventData: Omit<CalendarEvent, 'id'>) => {
-    const newEvent: CalendarEvent = {
-      ...eventData,
-      id: 'event-' + Math.random().toString(36).substring(2, 9),
-    };
+    const newEvent: CalendarEvent = { ...eventData, id: uid('event') };
     setEvents((prev) => [...prev, newEvent]);
     addToast(`Event "${newEvent.title}" added to calendar`, 'success');
     logActivity(`Added event "${newEvent.title}"`, 'event_added', newEvent.date);
@@ -708,12 +657,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addToast('Event removed', 'warning');
   };
 
-  // Timetable Actions
+  // ---------------- Timetable actions ----------------
   const addTimetableSlot = (slotData: Omit<TimetableSlot, 'id'>) => {
-    const newSlot: TimetableSlot = {
-      ...slotData,
-      id: 'tt-' + Math.random().toString(36).substring(2, 9),
-    };
+    const newSlot: TimetableSlot = { ...slotData, id: uid('tt') };
     setTimetable((prev) => [...prev, newSlot]);
     addToast(`Added "${newSlot.subject}" to timetable`, 'success');
     logActivity(`Added timetable slot "${newSlot.subject}"`, 'timetable_updated', newSlot.day.toUpperCase());
@@ -729,15 +675,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addToast('Slot removed from timetable', 'warning');
   };
 
-  // Note Actions
+  // ---------------- Note actions ----------------
   const addNote = (noteData: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = new Date().toISOString();
-    const newNote: Note = {
-      ...noteData,
-      id: 'note-' + Math.random().toString(36).substring(2, 9),
-      createdAt: now,
-      updatedAt: now,
-    };
+    const newNote: Note = { ...noteData, id: uid('note'), createdAt: now, updatedAt: now };
     setNotes((prev) => [newNote, ...prev]);
     addToast(`Note "${newNote.title}" created`, 'success');
     logActivity(`Created note "${newNote.title}"`, 'note_created', newNote.category);
@@ -755,16 +696,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const toggleNoteFavorite = (id: string) => {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isFavorite: !n.isFavorite } : n))
-    );
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, isFavorite: !n.isFavorite } : n)));
     addToast('Note favorite toggled', 'info');
   };
 
   const toggleNoteArchive = (id: string) => {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isArchived: !n.isArchived } : n))
-    );
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, isArchived: !n.isArchived } : n)));
     addToast('Note archive updated', 'info');
   };
 
@@ -774,102 +711,101 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  // ---------------- Settings ----------------
   const updateSettings = (updates: Partial<UserSettings>) => {
     setSettings((prev) => ({ ...prev, ...updates }));
     addToast('Settings saved', 'info');
   };
 
-  // Keyboard shortcut listener for Ctrl+K / Cmd+K
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setCommandPaletteOpen((open) => !open);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Filter Selectors
-  const activeTasks = tasks.filter((t) => !t.isArchived);
-  const completedTasks = activeTasks.filter((t) => t.status === 'completed');
-  
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayTasks = activeTasks.filter((t) => t.dueDate === todayStr);
-  const upcomingTasks = activeTasks.filter((t) => t.dueDate > todayStr && t.status !== 'completed');
-  const overdueTasks = activeTasks.filter((t) => t.dueDate < todayStr && t.status !== 'completed');
-  const highPriorityTasks = activeTasks.filter((t) => t.priority === 'high' && t.status !== 'completed');
-
-  return (
-    <AppContext.Provider
-      value={{
-        activeTab,
-        setActiveTab,
-        tasks,
-        addTask,
-        updateTask,
-        deleteTask,
-        toggleTaskComplete,
-        toggleTaskFavorite,
-        toggleTaskArchive,
-        updateTaskStatus,
-        events,
-        addEvent,
-        updateEvent,
-        deleteEvent,
-        timetable,
-        addTimetableSlot,
-        updateTimetableSlot,
-        deleteTimetableSlot,
-        notes,
-        addNote,
-        updateNote,
-        deleteNote,
-        toggleNoteFavorite,
-        toggleNoteArchive,
-        updateNoteBlocks,
-        activities,
-        isAuthenticated,
-        authLoading,
-        supabaseUser,
-        oauthSigninError,
-        clearOauthSigninError,
-        login,
-        logout,
-        signupWithSupabase,
-        loginWithSupabase,
-        loginWithGoogleSupabase,
-        logoutWithSupabase,
-        resetPasswordWithSupabase,
-        profile,
-        setProfile,
-        settings,
-        updateSettings,
-        clearWorkspaceData,
-        searchQuery,
-        setSearchQuery,
-        isCommandPaletteOpen,
-        setCommandPaletteOpen,
-        isQuickTaskModalOpen,
-        setQuickTaskModalOpen,
-        toasts,
-        addToast,
-        removeToast,
-        activeTasks,
-        completedTasks,
-        todayTasks,
-        upcomingTasks,
-        overdueTasks,
-        highPriorityTasks,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+  // ---------------- Derived selectors ----------------
+  const activeTasks = useMemo(() => tasks.filter((t) => !t.isArchived), [tasks]);
+  const completedTasks = useMemo(() => activeTasks.filter((t) => t.status === 'completed'), [activeTasks]);
+  const todayStr = todayISO();
+  const todayTasks = useMemo(() => activeTasks.filter((t) => t.dueDate === todayStr), [activeTasks, todayStr]);
+  const upcomingTasks = useMemo(
+    () => activeTasks.filter((t) => t.dueDate > todayStr && t.status !== 'completed'),
+    [activeTasks, todayStr]
   );
+  const overdueTasks = useMemo(
+    () => activeTasks.filter((t) => t.dueDate < todayStr && t.status !== 'completed'),
+    [activeTasks, todayStr]
+  );
+  const highPriorityTasks = useMemo(
+    () => activeTasks.filter((t) => t.priority === 'high' && t.status !== 'completed'),
+    [activeTasks]
+  );
+
+  const value: AppContextType = {
+    activeTab,
+    setActiveTab,
+    tasks,
+    addTask,
+    updateTask,
+    deleteTask,
+    toggleTaskComplete,
+    toggleTaskFavorite,
+    toggleTaskArchive,
+    updateTaskStatus,
+    events,
+    addEvent,
+    updateEvent,
+    deleteEvent,
+    timetable,
+    addTimetableSlot,
+    updateTimetableSlot,
+    deleteTimetableSlot,
+    notes,
+    addNote,
+    updateNote,
+    deleteNote,
+    toggleNoteFavorite,
+    toggleNoteArchive,
+    updateNoteBlocks,
+    hasVaultPin,
+    isVaultUnlocked,
+    setVaultPin,
+    unlockVault,
+    lockVault,
+    resetVaultPin,
+    activities,
+    isAuthenticated,
+    authLoading,
+    supabaseUser,
+    oauthSigninError,
+    clearOauthSigninError,
+    login,
+    logout,
+    signupWithSupabase,
+    loginWithSupabase,
+    loginWithGoogleSupabase,
+    logoutWithSupabase,
+    resetPasswordWithSupabase,
+    profile,
+    setProfile,
+    settings,
+    updateSettings,
+    clearWorkspaceData,
+    searchQuery,
+    setSearchQuery,
+    isCommandPaletteOpen,
+    setCommandPaletteOpen,
+    isQuickTaskModalOpen,
+    setQuickTaskModalOpen,
+    toasts,
+    addToast,
+    removeToast,
+    activeTasks,
+    completedTasks,
+    todayTasks,
+    upcomingTasks,
+    overdueTasks,
+    highPriorityTasks,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
-export const useApp = () => {
+export const useApp = (): AppContextType => {
   const context = useContext(AppContext);
   if (!context) {
     throw new Error('useApp must be used within an AppProvider');

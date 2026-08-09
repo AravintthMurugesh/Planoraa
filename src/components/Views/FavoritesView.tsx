@@ -1,16 +1,24 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Star, CheckSquare, FileText } from 'lucide-react';
+import { Star, CheckSquare, FileText, Archive } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const FavoritesView: React.FC = () => {
-  const { activeTasks, notes, toggleTaskFavorite, toggleNoteFavorite, setActiveTab } = useApp();
+  const {
+    activeTasks,
+    notes,
+    toggleTaskFavorite,
+    toggleNoteFavorite,
+    toggleTaskArchive,
+    toggleNoteArchive,
+    setActiveTab,
+  } = useApp();
 
   const favoriteTasks = activeTasks.filter((t) => t.isFavorite);
   const favoriteNotes = notes.filter((n) => n.isFavorite);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 animate-fade-up">
       <div>
         <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
           <Star className="w-7 h-7 text-amber-400 fill-amber-400" />
@@ -22,7 +30,7 @@ export const FavoritesView: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {/* Favorited Tasks */}
+        {/* Favorited tasks */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             Starred Tasks ({favoriteTasks.length})
@@ -34,34 +42,54 @@ export const FavoritesView: React.FC = () => {
               </div>
             ) : (
               favoriteTasks.map((t) => (
-                <div
+                <motion.div
                   key={t.id}
+                  whileHover={{ y: -2 }}
                   onClick={() => setActiveTab('todo')}
-                  className="glass-card p-4 flex items-center justify-between cursor-pointer hover:border-indigo-500/50 transition-all group"
+                  className="glass-card p-4 flex items-center justify-between cursor-pointer card-lift group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <CheckSquare className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
+                      <CheckSquare className="w-4 h-4" />
+                    </div>
                     <div className="min-w-0">
-                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">{t.title}</h4>
-                      <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{t.category} • Due {t.dueDate}</p>
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                        {t.title}
+                      </h4>
+                      <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                        {t.category} • Due {t.dueDate}
+                      </p>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTaskFavorite(t.id);
-                    }}
-                    className="p-1 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
-                  >
-                    <Star className="w-4 h-4 fill-amber-400" />
-                  </button>
-                </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTaskFavorite(t.id);
+                      }}
+                      className="p-1 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
+                      title="Unstar"
+                    >
+                      <Star className="w-4 h-4 fill-amber-400" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTaskArchive(t.id);
+                      }}
+                      className="p-1 text-slate-400 hover:text-[var(--accent-color)] hover:bg-[var(--accent-soft)] rounded-lg transition-all cursor-pointer"
+                      title="Move to Vault"
+                    >
+                      <Archive className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
               ))
             )}
           </div>
         </div>
 
-        {/* Favorited Notes */}
+        {/* Favorited notes */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             Starred Notes ({favoriteNotes.length})
@@ -73,28 +101,48 @@ export const FavoritesView: React.FC = () => {
               </div>
             ) : (
               favoriteNotes.map((n) => (
-                <div
+                <motion.div
                   key={n.id}
+                  whileHover={{ y: -2 }}
                   onClick={() => setActiveTab('notes')}
-                  className="glass-card p-4 flex items-center justify-between cursor-pointer hover:border-indigo-500/50 transition-all group"
+                  className="glass-card p-4 flex items-center justify-between cursor-pointer card-lift group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-lg shrink-0">{n.icon || '📝'}</span>
+                    <div className="p-2 rounded-xl bg-[var(--accent-soft)] text-[var(--accent-color)] shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
                     <div className="min-w-0">
-                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">{n.title}</h4>
-                      <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{n.category}</p>
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                        {n.title}
+                      </h4>
+                      <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                        {n.category} • {n.blocks.length} blocks
+                      </p>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleNoteFavorite(n.id);
-                    }}
-                    className="p-1 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
-                  >
-                    <Star className="w-4 h-4 fill-amber-400" />
-                  </button>
-                </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleNoteFavorite(n.id);
+                      }}
+                      className="p-1 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
+                      title="Unstar"
+                    >
+                      <Star className="w-4 h-4 fill-amber-400" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleNoteArchive(n.id);
+                      }}
+                      className="p-1 text-slate-400 hover:text-[var(--accent-color)] hover:bg-[var(--accent-soft)] rounded-lg transition-all cursor-pointer"
+                      title="Move to Vault"
+                    >
+                      <Archive className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
               ))
             )}
           </div>

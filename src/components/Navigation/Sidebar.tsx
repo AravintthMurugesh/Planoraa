@@ -31,7 +31,7 @@ interface NavItem {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose }) => {
-  const { activeTab, setActiveTab, activeTasks, notes, overdueTasks, settings } = useApp();
+  const { activeTab, setActiveTab, activeTasks, notes, overdueTasks } = useApp();
 
   const primaryNavItems: NavItem[] = [
     { id: 'home', label: 'Dashboard', icon: Home },
@@ -57,15 +57,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
     onMobileClose();
   };
 
-  const renderNavItem = (item: NavItem) => {
+  const renderNavItem = (item: NavItem, index: number) => {
     const Icon = item.icon;
     const isActive = activeTab === item.id;
     const isAlert = typeof item.badge === 'string' && item.badge.includes('Alert');
 
     return (
-      <button
+      <motion.button
         key={item.id}
         onClick={() => handleSelect(item.id)}
+        initial={{ opacity: 0, x: -14 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.08 + index * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className={cn(
           'relative w-full flex items-center justify-between pl-2.5 pr-3 py-2.5 rounded-2xl font-semibold text-[13px] transition-all duration-300 group cursor-pointer mb-0.5',
           isActive
@@ -76,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         {isActive && (
           <motion.div
             layoutId="sidebar-active-pill"
-            className="absolute inset-0 bg-gradient-to-r from-[var(--accent-soft)] via-[var(--accent-soft)] to-transparent border-b border-[var(--accent-soft)] rounded-2xl shadow-lg shadow-[var(--accent-soft)]"
+            className="absolute inset-0 sidebar-active-pill bg-gradient-to-r from-[var(--accent-soft)] via-[var(--accent-soft)] to-transparent border-b border-[var(--accent-soft)] rounded-2xl shadow-lg shadow-[var(--accent-soft)]"
             transition={{ type: 'spring', stiffness: 420, damping: 34 }}
           />
         )}
@@ -87,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
               'p-2 rounded-xl transition-all duration-300',
               isActive
                 ? 'bg-[var(--accent-color)] text-white shadow-md shadow-[var(--accent-soft)] scale-105'
-                : 'bg-slate-900/5 dark:bg-white/5 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:bg-slate-900/10 dark:group-hover:bg-white/10'
+                : 'bg-slate-900/5 dark:bg-white/5 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:bg-slate-900/10 dark:group-hover:bg-white/10 group-hover:translate-x-0.5'
             )}
           >
             <Icon className="w-4 h-4" />
@@ -96,9 +99,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
         </div>
 
         {item.badge !== undefined && (
-          <span
+          <motion.span
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.3 + index * 0.05, type: 'spring', stiffness: 500, damping: 24 }}
             className={cn(
-              'relative z-10 text-[10px] font-black px-2 py-0.5 rounded-full transition-all shrink-0',
+              'relative z-10 text-[10px] font-black px-2 py-0.5 rounded-full transition-all shrink-0 tabular-nums',
               isActive
                 ? 'bg-white/90 text-[var(--accent-color)] shadow-sm'
                 : isAlert
@@ -107,15 +113,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
             )}
           >
             {item.badge}
-          </span>
+          </motion.span>
         )}
-      </button>
+      </motion.button>
     );
   };
 
   const sidebarContent = (
-    <aside className="w-64 h-full rounded-2xl glass-panel border border-slate-200/80 dark:border-white/10 flex flex-col justify-between p-3.5 select-none overflow-y-auto">
-      <div className="space-y-5">
+    <aside className="h-full w-64 rounded-2xl glass-panel border border-slate-200/80 dark:border-white/10 flex flex-col p-3.5 select-none">
+      <div className="flex flex-col flex-1 gap-5">
         {/* Mobile Header */}
         <div className="px-2 py-1 flex items-center justify-between md:hidden">
           <div className="flex items-center gap-2.5">
@@ -140,16 +146,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
             <Layers className="w-3 h-3 text-[var(--accent-color)]" />
             <span>Core Modules</span>
           </div>
-          <nav className="space-y-0.5">{primaryNavItems.map(renderNavItem)}</nav>
+          <nav className="space-y-0.5">{primaryNavItems.map((item, i) => renderNavItem(item, i))}</nav>
         </div>
 
         {/* Collections */}
-        <div>
+        <div className="md:mt-0 mt-auto">
           <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
             <Gem className="w-3 h-3 text-[var(--accent-color)]" />
             <span>Spaces & Archives</span>
           </div>
-          <nav className="space-y-0.5">{collectionNavItems.map(renderNavItem)}</nav>
+          <nav className="space-y-0.5">{collectionNavItems.map((item, i) => renderNavItem(item, i + primaryNavItems.length))}</nav>
         </div>
       </div>
     </aside>
@@ -157,10 +163,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
 
   return (
     <>
-      {/* Desktop floating sidebar */}
-      <div className="hidden md:block h-[calc(100vh-5.5rem)] sticky top-20 py-3 pl-4 pr-2">
-        {sidebarContent}
-      </div>
+      {/* Desktop sidebar (scrolls with page) */}
+      <div className="hidden md:block shrink-0 self-stretch py-3 pl-4 pr-2">{sidebarContent}</div>
 
       {/* Mobile drawer */}
       <AnimatePresence>
@@ -178,7 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose })
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-              className="relative z-10 w-72 h-full p-4"
+              className="relative z-10 w-72 h-full p-4 overflow-y-auto"
             >
               {sidebarContent}
             </motion.div>

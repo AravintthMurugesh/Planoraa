@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navigation/Navbar';
@@ -6,6 +6,7 @@ import { Sidebar } from './components/Navigation/Sidebar';
 import AuroraBackground from './components/AuroraBackground';
 import { CommandPalette } from './components/CommandPalette';
 import { QuickAddTaskModal } from './components/QuickAddTaskModal';
+import { PlanoraAssistant } from './components/PlanoraAssistant/PlanoraAssistant';
 import { ToastContainer } from './components/Toast';
 
 import { HomeView } from './components/Views/HomeView';
@@ -18,6 +19,7 @@ import { FavoritesView } from './components/Views/FavoritesView';
 import { ArchiveView } from './components/Views/ArchiveView';
 import { SettingsView } from './components/Views/SettingsView';
 import { LoginView } from './components/LoginView';
+import { ResetPasswordView } from './components/ResetPasswordView';
 
 const LoadingScreen: React.FC = () => (
   <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-[#0B1020] text-slate-900 dark:text-white relative overflow-hidden">
@@ -75,35 +77,58 @@ const LoadingScreen: React.FC = () => (
 );
 
 const MainLayout: React.FC = () => {
-  const { activeTab, isAuthenticated, authLoading } = useApp();
+  const { activeTab, isAuthenticated, authLoading, isRecoveryMode, clearRecoveryMode } = useApp();
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'forgot'>('signin');
+
+  // Whenever the user is signed out (and not mid-recovery), make sure the
+  // login screen starts on the Sign In tab, not a stale "forgot" mode.
+  useEffect(() => {
+    if (!isAuthenticated && !isRecoveryMode) {
+      setAuthMode('signin');
+    }
+  }, [isAuthenticated, isRecoveryMode]);
 
   if (authLoading) {
     return <LoadingScreen />;
   }
 
+  if (isRecoveryMode) {
+    return (
+      <>
+        <ResetPasswordView
+          onRequestNewLink={() => {
+            clearRecoveryMode();
+            setAuthMode('forgot');
+          }}
+        />
+        <ToastContainer />
+      </>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <>
-        <LoginView />
+        <LoginView key={authMode} initialMode={authMode} />
         <ToastContainer />
       </>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#070B15] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 relative overflow-x-hidden">
+    <div className="h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#070B15] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 relative overflow-hidden">
       <AuroraBackground />
 
       <Navbar onMobileMenuToggle={() => setMobileSidebarOpen(!isMobileSidebarOpen)} />
 
-      <div className="flex-1 flex max-w-[1600px] w-full mx-auto relative z-10">
+      <div className="flex-1 min-h-0 flex max-w-[1600px] w-full mx-auto relative z-10">
         <Sidebar
           isMobileOpen={isMobileSidebarOpen}
           onMobileClose={() => setMobileSidebarOpen(false)}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 transition-all">
+        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 transition-all">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -111,7 +136,6 @@ const MainLayout: React.FC = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.99 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="h-full"
             >
               {activeTab === 'home' && <HomeView />}
               {activeTab === 'todo' && <TodoListView />}
@@ -129,6 +153,7 @@ const MainLayout: React.FC = () => {
 
       <CommandPalette />
       <QuickAddTaskModal />
+      <PlanoraAssistant />
       <ToastContainer />
     </div>
   );

@@ -3,6 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
+// Canonical app URL used for auth redirects (password reset, etc.).
+// Override via VITE_SITE_URL; defaults to the browser's current origin so it
+// works in dev (http://localhost:3000) and in production without changes.
+export const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,

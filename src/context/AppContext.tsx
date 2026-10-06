@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { User, AuthError, Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../supabase';
+import { supabase, isSupabaseConfigured, SITE_URL } from '../supabase';
 import { uid, todayISO } from '../lib/utils';
 import { readStorage, writeStorage, removeStorage } from '../lib/storage';
 import {
@@ -18,15 +18,7 @@ import {
   ActivityType,
   ToastType,
 } from '../types';
-import {
-  initialTasks,
-  initialEvents,
-  initialTimetableSlots,
-  initialNotes,
-  initialActivities,
-  initialProfile,
-  initialSettings,
-} from '../data/initialData';
+import { initialProfile, initialSettings } from '../data/initialData';
 
 const STORAGE_KEYS = {
   tasks: 'mytasks_items',
@@ -37,6 +29,7 @@ const STORAGE_KEYS = {
   profile: 'mytasks_profile',
   settings: 'mytasks_settings',
   authenticated: 'planora_authenticated',
+  recovery: 'planora_recovery_active',
 } as const;
 
 const OAUTH_URL_PARAMS = [
@@ -49,6 +42,7 @@ const OAUTH_URL_PARAMS = [
   'provider_refresh_token',
   'code',
   'state',
+  'type',
   'error',
   'error_description',
   'error_code',
@@ -141,13 +135,19 @@ interface AppContextType {
   supabaseUser: User | null;
   oauthSigninError: string | null;
   clearOauthSigninError: () => void;
-  login: (email?: string, name?: string, isNewSignUp?: boolean) => void;
+  login: (email?: string, name?: string, isNewSignUp?: boolean, withDemoData?: boolean) => void;
   logout: () => void;
   signupWithSupabase: (email: string, pass: string, fullName: string) => Promise<AuthResult>;
   loginWithSupabase: (email: string, pass: string) => Promise<AuthResult>;
   loginWithGoogleSupabase: () => Promise<AuthResult>;
   logoutWithSupabase: () => Promise<void>;
   resetPasswordWithSupabase: (email: string) => Promise<{ error: { message: string } | null }>;
+  updatePasswordWithSupabase: (newPassword: string) => Promise<{ error: { message: string } | null }>;
+  isRecoveryMode: boolean;
+  isRecoveryExpired: boolean;
+  completeRecovery: () => void;
+  clearRecoveryMode: () => void;
+  markRecoveryExpired: () => void;
 
   // Profile & Settings
   profile: UserProfile;
@@ -189,16 +189,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // ---------------- Persistent Workspace Data ----------------
-  const [tasks, setTasks] = useState<Task[]>(() => readStorage<Task[]>(STORAGE_KEYS.tasks, initialTasks));
+  const [tasks, setTasks] = useState<Task[]>(() => readStorage<Task[]>(STORAGE_KEYS.tasks, []));
   const [events, setEvents] = useState<CalendarEvent[]>(() =>
-    readStorage<CalendarEvent[]>(STORAGE_KEYS.events, initialEvents)
+    readStorage<CalendarEvent[]>(STORAGE_KEYS.events, [])
   );
   const [timetable, setTimetable] = useState<TimetableSlot[]>(() =>
-    readStorage<TimetableSlot[]>(STORAGE_KEYS.timetable, initialTimetableSlots)
+    readStorage<TimetableSlot[]>(STORAGE_KEYS.timetable, [])
   );
-  const [notes, setNotes] = useState<Note[]>(() => readStorage<Note[]>(STORAGE_KEYS.notes, initialNotes));
+  const [notes, setNotes] = useState<Note[]>(() => readStorage<Note[]>(STORAGE_KEYS.notes, []));
   const [activities, setActivities] = useState<ActivityItem[]>(() =>
-    readStorage<ActivityItem[]>(STORAGE_KEYS.activities, initialActivities)
+    readStorage<ActivityItem[]>(STORAGE_KEYS.activities, [])
   );
   const [profile, setProfile] = useState<UserProfile>(() =>
     readStorage<UserProfile>(STORAGE_KEYS.profile, initialProfile)
@@ -239,6 +239,8 @@ const writeRaw = (key: string, value: string): void => {
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
   const [oauthSigninError, setOauthSigninError] = useState<string | null>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState<boolean>(false);
+  const [isRecoveryExpired, setIsRecoveryExpired] = useState<boolean>(false);
 
   // ---------------- Toast system ----------------
   const removeToast = (id: string) => {
@@ -351,6 +353,8 @@ const writeRaw = (key: string, value: string): void => {
           console.warn('Google OAuth callback error:', oauthError);
           setOauthSigninError(oauthError);
         }
+        const urlType = redirectParams.get('type');
+        const hadRecoveryFlag = readRaw(STORAGE_KEYS.recovery) === 'true';
 
         const {
           data: { session },
@@ -367,6 +371,20 @@ const writeRaw = (key: string, value: string): void => {
           const identity = syncProfileFromUser(session.user);
           upsertProfileRecord(session.user.id, identity.fullName, session.user.email, identity.provider);
         }
+
+        // Password recovery detection.
+        // Valid link  -> session exists -> enter recovery mode (covers page refresh).
+        // Invalid link -> no session -> enter recovery mode flagged as expired.
+        if (isMounted && !session?.user) {
+          if (urlType === 'recovery' || hadRecoveryFlag) {
+            removeStorage(STORAGE_KEYS.recovery);
+            setIsRecoveryMode(true);
+            setIsRecoveryExpired(true);
+          }
+        } else if (isMounted && hadRecoveryFlag && session?.user) {
+          setIsRecoveryMode(true);
+          setIsRecoveryExpired(false);
+        }
       } catch (err) {
         console.warn('Supabase auth initialization error:', err);
       } finally {
@@ -380,6 +398,17 @@ const writeRaw = (key: string, value: string): void => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Recovery session detected (e.g. user clicked the reset link).
+        // Do NOT sign the user in yet — show the reset-password screen instead.
+        if (session?.user) {
+          setSupabaseUser(session.user);
+          setIsRecoveryMode(true);
+          setIsRecoveryExpired(false);
+          writeRaw(STORAGE_KEYS.recovery, 'true');
+        }
+        return;
+      }
       if (session?.user) {
         setSupabaseUser(session.user);
         setIsAuthenticated(true);
@@ -460,7 +489,7 @@ const writeRaw = (key: string, value: string): void => {
 
   const loginWithGoogleSupabase = async (): Promise<AuthResult> => {
     if (!isSupabaseConfigured()) {
-      login('alex.morgan@gmail.com', 'Alex Morgan');
+      login('user@planora.app', 'User');
       addToast('Signed in with Google!', 'success');
       return { data: { session: null }, error: null };
     }
@@ -507,20 +536,54 @@ const writeRaw = (key: string, value: string): void => {
     if (!isSupabaseConfigured()) {
       return { error: null };
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+    console.log('Password reset requested for:', email);
+    const result = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: SITE_URL,
     });
+    console.log('Password reset result:', { data: result.data, error: result.error });
+    return { error: result.error };
+  };
+
+  const updatePasswordWithSupabase = async (
+    newPassword: string
+  ): Promise<{ error: { message: string } | null }> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     return { error };
   };
 
-  const login = (email?: string, name?: string, isNewSignUp: boolean = false) => {
+  const completeRecovery = () => {
+    removeStorage(STORAGE_KEYS.recovery);
+    setIsRecoveryMode(false);
+    setIsRecoveryExpired(false);
+    setIsAuthenticated(true);
+    writeStorage(STORAGE_KEYS.authenticated, true);
+  };
+
+  const clearRecoveryMode = () => {
+    removeStorage(STORAGE_KEYS.recovery);
+    setIsRecoveryMode(false);
+    setIsRecoveryExpired(false);
+  };
+
+  const markRecoveryExpired = () => {
+    removeStorage(STORAGE_KEYS.recovery);
+    setIsRecoveryMode(true);
+    setIsRecoveryExpired(true);
+  };
+
+  // ---------------- Demo login fallback (Supabase not configured) ----------------
+  const login = (
+    email?: string,
+    name?: string,
+    isNewSignUp: boolean = false
+  ) => {
     if (isNewSignUp) clearWorkspaceData();
     setIsAuthenticated(true);
     writeStorage(STORAGE_KEYS.authenticated, true);
     if (email || name) {
       setProfile((prev) => ({ ...prev, email: email || prev.email, name: name || prev.name }));
     }
-    addToast(`Welcome to Planora, ${name || profile.name}!`, 'success');
+    addToast(`Welcome to Planora, ${name || profile.name || 'User'}!`, 'success');
   };
 
   const logout = () => {
@@ -780,6 +843,12 @@ const writeRaw = (key: string, value: string): void => {
     loginWithGoogleSupabase,
     logoutWithSupabase,
     resetPasswordWithSupabase,
+    updatePasswordWithSupabase,
+    isRecoveryMode,
+    isRecoveryExpired,
+    completeRecovery,
+    clearRecoveryMode,
+    markRecoveryExpired,
     profile,
     setProfile,
     settings,

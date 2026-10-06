@@ -199,7 +199,7 @@ export const CalendarView: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="space-y-1 overflow-y-auto max-h-16 no-scrollbar mt-1">
+                      <div className="space-y-1 mt-1">
                         {dayEvents.map((ev) => (
                           <div
                             key={ev.id}
@@ -241,7 +241,7 @@ export const CalendarView: React.FC = () => {
             <span className="text-xs font-bold text-slate-400 tabular-nums">{todayStr}</span>
           </div>
 
-          <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] no-scrollbar">
+          <div className="space-y-3 flex-1">
             {todayAgenda.length === 0 ? (
               <div className="text-center py-10 space-y-2">
                 <div className="w-12 h-12 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center mx-auto">

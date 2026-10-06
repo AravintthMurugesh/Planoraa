@@ -145,7 +145,7 @@ export const NotesView: React.FC = () => {
             />
           </div>
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 no-scrollbar">
+          <div className="space-y-2">
             {filteredNotes.length === 0 && (
               <div className="p-8 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">

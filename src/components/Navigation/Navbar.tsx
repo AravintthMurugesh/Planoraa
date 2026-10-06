@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
@@ -42,6 +42,38 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentSeconds, setCurrentSeconds] = useState<string>('');
 
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const closeMenus = () => {
+      setShowNotifications(false);
+      setShowProfileMenu(false);
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (
+        !notificationRef.current?.contains(e.target as Node) &&
+        !profileRef.current?.contains(e.target as Node)
+      ) {
+        closeMenus();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeMenus();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -77,16 +109,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
             onClick={() => setActiveTab('home')}
             className="flex items-center gap-3 cursor-pointer group select-none"
           >
-            <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-[var(--accent-color)] to-[var(--accent-hover)] shadow-lg shadow-[var(--accent-soft)] flex items-center justify-center text-white transition-transform duration-300 group-hover:scale-105">
+            <div className="relative gradient-ring w-9 h-9 rounded-xl bg-gradient-to-tr from-[var(--accent-color)] to-[var(--accent-hover)] shadow-lg shadow-[var(--accent-soft)] flex items-center justify-center text-white transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
               <Sparkles className="w-4.5 h-4.5" strokeWidth={2.4} />
             </div>
             <div className="flex flex-col justify-center min-w-0">
               <span className="font-black text-[17px] text-slate-900 dark:text-white tracking-tight leading-none transition-colors">
                 Planora
               </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wide leading-none mt-1 flex items-center gap-1">
+              <span className="eyebrow text-[8px] text-slate-500 dark:text-slate-400 tracking-[0.24em] leading-none mt-1 flex items-center gap-1.5">
                 <ShieldCheck className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
-                Productivity Suite
+                Private Workspace
               </span>
             </div>
           </div>
@@ -138,15 +170,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
             className="p-2.5 rounded-xl bg-slate-900/5 dark:bg-white/5 hover:bg-slate-900/10 dark:hover:bg-white/10 border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer btn-press"
             title={`Switch to ${settings.theme === 'dark' ? 'light' : 'dark'} mode`}
           >
-            {settings.theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-500" />
-            ) : (
-              <Moon className="w-4 h-4 text-[var(--accent-color)]" />
-            )}
+            <motion.span key={settings.theme} className="flex" initial={{ rotate: -90, scale: 0.5, opacity: 0 }} animate={{ rotate: 0, scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
+              {settings.theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-500" />
+              ) : (
+                <Moon className="w-4 h-4 text-[var(--accent-color)]" />
+              )}
+            </motion.span>
           </button>
 
           {/* Notifications */}
-          <div className="relative">
+          <div className="relative" ref={notificationRef}>
             <button
               onClick={() => {
                 setShowNotifications(!showNotifications);
@@ -172,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.97 }}
                   transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-                  className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl glass-panel shadow-2xl py-3 z-50 border border-slate-200/80 dark:border-white/10 overflow-hidden"
+                  className="!absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl glass-panel shadow-2xl py-3 z-50 border border-slate-200/80 dark:border-white/10 overflow-hidden"
                 >
                   <div className="px-4 pb-3 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -252,7 +286,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           </div>
 
           {/* Profile */}
-          <div className="relative">
+          <div className="relative" ref={profileRef}>
             <button
               onClick={() => {
                 setShowProfileMenu(!showProfileMenu);
@@ -278,7 +312,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.97 }}
                   transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-                  className="absolute right-0 mt-3 w-64 rounded-2xl glass-panel shadow-2xl p-3 z-50 border border-slate-200/80 dark:border-white/10"
+                  className="!absolute right-0 top-full mt-2 w-64 rounded-2xl glass-panel shadow-2xl p-3 z-50 border border-slate-200/80 dark:border-white/10"
                 >
                   <div className="flex items-center gap-3 p-2.5 bg-[var(--accent-soft)] rounded-xl mb-2">
                     <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)] flex items-center justify-center shrink-0 shadow-md">
